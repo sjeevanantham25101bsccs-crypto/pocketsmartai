@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}PocketSmart AI{% endblock %}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  {% block navbar %}
+  <div class="navbar">
+    <a class="brand" href="/">📊 PocketSmart</a>
+    <nav>
+      {% if user %}
+        <a href="/dashboard">Dashboard</a>
+        <a href="/home-planner">Home Planner</a>
+        <a href="/party-planner">Party Planner</a>
+        <a href="/jewelry-planner">Jewelry Planner</a>
+        <a href="/history">History</a>
+        <a href="#" id="logoutLink" class="btn btn-outline">Logout</a>
+      {% else %}
+        <a href="/#features">Features</a>
+        <a href="/#testimonials">Testimonials</a>
+        <a href="/login">Sign In</a>
+        <a href="/register" class="btn btn-primary">Get Started</a>
+      {% endif %}
+    </nav>
+  </div>
+  {% endblock %}
+
+  {% block content %}{% endblock %}
+
+  {% block footer %}
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div>
+        <h4>PocketSmart</h4>
+        <p>AI-powered budget planning tools to help you make smarter financial decisions every day.</p>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <p>About Us<br>Our Team<br>Careers<br>Contact Us</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <p>Home Planner<br>Party Planner<br>Jewelry Planner<br>Pricing</p>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <p>Blog<br>Guides<br>FAQ<br>Support</p>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <p>Privacy Policy<br>Terms of Service<br>Cookies Policy</p>
+      </div>
+    </div>
+    <div class="copyright">&copy; 2026 PocketSmart. All rights reserved.</div>
+  </footer>
+  {% endblock %}
+
+  <script>
+    // Attach a Bearer token to every fetch call automatically, and wire the logout link.
+    function pocketSmartToken() {
+      return localStorage.getItem('ps_token') || '';
+    }
+    function pocketSmartAuthFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      const token = pocketSmartToken();
+      if (token) options.headers['Authorization'] = 'Bearer ' + token;
+      options.credentials = 'include';
+      return fetch(url, options);
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      const logoutLink = document.getElementById('logoutLink');
+      if (logoutLink) {
+        logoutLink.addEventListener('click', async (e) => {
+          e.preventDefault();
+          localStorage.removeItem('ps_token');
+          await fetch('/logout', { method: 'POST', credentials: 'include' });
+          window.location.href = '/login';
+        });
+      }
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

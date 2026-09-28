@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Sign In - PocketSmart AI{% endblock %}
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-box">
+    <div class="brand-title">PocketSmart</div>
+    <div class="brand-sub">AI-Powered Budget Planning</div>
+    <div class="auth-card">
+      <h2>Welcome Back</h2>
+      <div class="error-banner" id="errorBanner"></div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="username" placeholder="Enter your username" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="password" placeholder="Enter your password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Sign In &rarr;</button>
+      </form>
+      <div class="auth-footer">Don't have an account? <a href="/register" style="color:var(--blue-500);font-weight:600;">Create Account</a></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorBanner = document.getElementById('errorBanner');
+  errorBanner.style.display = 'none';
+
+  const formData = new URLSearchParams();
+  formData.append('username', document.getElementById('username').value);
+  formData.append('password', document.getElementById('password').value);
+
+  try {
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData,
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Login failed');
+    }
+    const data = await res.json();
+    localStorage.setItem('ps_token', data.access_token);
+    window.location.href = '/dashboard';
+  } catch (err) {
+    errorBanner.textContent = err.message;
+    errorBanner.style.display = 'block';
+  }
+});
+</script>
+{% endblock %}

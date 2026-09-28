@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Recommendation History - PocketSmart AI{% endblock %}
+{% block content %}
+
+<div class="planner-header">
+  <h1>Your Recommendation History</h1>
+  <p>View and manage all your previous budget plans and recommendations</p>
+</div>
+
+<div class="planner-wrap" style="max-width:1000px;">
+  <div id="historyArea" class="loading-spinner">Loading your history…</div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadHistory() {
+  const area = document.getElementById('historyArea');
+  try {
+    const res = await pocketSmartAuthFetch('/recommendation-history');
+    if (!res.ok) throw new Error('Failed to load history');
+    const data = await res.json();
+    renderHistory(data.history || []);
+  } catch (err) {
+    area.innerHTML = `<div class="alert-error">${err.message}</div>`;
+  }
+}
+
+function renderHistory(items) {
+  const area = document.getElementById('historyArea');
+  if (!items.length) {
+    area.innerHTML = '<p style="text-align:center;color:var(--gray-500);">No recommendations yet. Try one of the planners!</p>';
+    return;
+  }
+
+  const icons = { home: '🏠', party: '🎉', jewelry: '💎' };
+  let html = '<div class="history-grid">';
+  items.forEach(item => {
+    const dt = new Date(item.timestamp);
+    const dateStr = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    html += `<div class="history-card ${item.type}">
+      <h4>${icons[item.type] || '📋'} ${item.type.charAt(0).toUpperCase() + item.type.slice(1)} Budget</h4>
+      <div class="ts">${dateStr}</div>
+      <div class="stats">
+        <span>Total Budget: ₹${Number(item.input.budget || 0).toFixed(0)}</span>
+        <span>Remaining: ₹${Number(item.summary.remaining_budget || 0).toFixed(0)}</span>
+      </div>
+      ${renderInputTags(item)}
+      <button class="btn btn-secondary btn-block" style="margin-top:12px;" onclick="viewDetails('${item.id}')">🔍 View Full Details</button>
+    </div>`;
+  });
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function renderInputTags(item) {
+  const input = item.input;
+  let tags = [];
+  if (item.type === 'home') {
+    tags = (input.rooms || []);
+  } else if (item.type === 'party') {
+    tags = [input.party_type, `${input.guests} guests`, ...(input.needs || [])];
+  } else if (item.type === 'jewelry') {
+    tags = [input.occasion, input.with_outfit_image ? 'with outfit image' : 'text only'];
+  }
+  return tags.filter(Boolean).map(t => `<span class="tag">${t}</span>`).join('');
+}
+
+async function viewDetails(id) {
+  try {
+    const res = await pocketSmartAuthFetch(`/recommendation-details/${id}`);
+    if (!res.ok) throw new Error('Failed to load details');
+    const data = await res.json();
+    alert(JSON.stringify(data.full_result, null, 2).slice(0, 4000));
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+loadHistory();
+</script>
+{% endblock %}

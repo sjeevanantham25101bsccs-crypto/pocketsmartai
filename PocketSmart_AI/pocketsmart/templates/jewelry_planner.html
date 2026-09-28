@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Jewelry Budget Planner - PocketSmart AI{% endblock %}
+{% block content %}
+
+<div class="planner-header">
+  <h1>Jewelry Budget Planner</h1>
+  <p>Get AI-powered jewelry recommendations within your budget for any occasion</p>
+</div>
+
+<div class="planner-wrap">
+  <div class="planner-form">
+    <div id="errorArea"></div>
+    <form id="jewelryForm">
+      <div class="fieldset-title">💰 Budget Details</div>
+      <div class="form-group">
+        <label>Total Budget (₹)</label>
+        <input type="number" id="total_budget" min="1" value="5000" required>
+      </div>
+
+      <div class="fieldset-title">🎀 Occasion &amp; Preferences</div>
+      <div class="form-group">
+        <label>Occasion</label>
+        <input type="text" id="occasion" placeholder="e.g. Birthday, Wedding, Anniversary" required>
+      </div>
+      <div class="form-group">
+        <label>Style Preferences</label>
+        <textarea id="preferences" placeholder="Describe your style preferences, materials, colors, etc."></textarea>
+      </div>
+
+      <div class="fieldset-title">📷 Upload Outfit Image (optional)</div>
+      <div class="upload-box">
+        <input type="file" id="image" accept="image/*" style="width:100%;">
+        <img id="imagePreview" style="display:none;">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:18px;">✏️ Get Recommendations</button>
+    </form>
+  </div>
+
+  <div id="resultArea"></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('image').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  const preview = document.getElementById('imagePreview');
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+});
+
+document.getElementById('jewelryForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorArea = document.getElementById('errorArea');
+  const resultArea = document.getElementById('resultArea');
+  errorArea.innerHTML = '';
+  resultArea.innerHTML = '<div class="loading-spinner">Analyzing your budget and style preferences…</div>';
+
+  const totalBudget = parseFloat(document.getElementById('total_budget').value);
+  const formData = new FormData();
+  formData.append('total_budget', totalBudget);
+  formData.append('occasion', document.getElementById('occasion').value);
+  formData.append('preferences', document.getElementById('preferences').value || '');
+  const imageFile = document.getElementById('image').files[0];
+  if (imageFile) formData.append('image', imageFile);
+
+  try {
+    const res = await pocketSmartAuthFetch('/jewelry-budget', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to generate recommendations');
+    }
+    const data = await res.json();
+    renderResult(data, totalBudget);
+  } catch (err) {
+    resultArea.innerHTML = '';
+    errorArea.innerHTML = `<div class="alert-error">${err.message}</div>`;
+  }
+});
+
+function renderResult(data, totalBudget) {
+  const resultArea = document.getElementById('resultArea');
+  let html = `
+    <div class="result-card">
+      <div class="rc-header">Your Personalized Jewelry Recommendations</div>
+      <div class="rc-body">
+        <div class="budget-summary">
+          <div>Total Budget: <span class="amount">₹${Number(totalBudget).toFixed(2)}</span></div>
+          <div>Remaining Budget: <span class="amount remaining">₹${Number(data.remaining_budget || 0).toFixed(2)}</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (data.outfit_analysis) {
+    const oa = data.outfit_analysis;
+    html += `<div class="result-card"><div class="rc-header">👗 Outfit Analysis</div><div class="rc-body">
+      Colors: ${(oa.colors || []).join(', ') || 'N/A'} &middot;
+      Style: ${oa.style || 'N/A'} &middot;
+      Formality: ${oa.formality || 'N/A'}
+    </div></div>`;
+  }
+
+  if (data.jewelry_recommendations && data.jewelry_recommendations.length) {
+    html += `<div class="result-card"><div class="rc-header">💎 Jewelry Recommendations</div><div class="rc-body">`;
+    data.jewelry_recommendations.forEach(item => {
+      html += `<div style="border-bottom:1px solid var(--gray-100);padding:12px 0;">
+        <div style="display:flex;justify-content:space-between;">
+          <strong style="text-transform:capitalize;">${item.item_type || ''}</strong>
+          <strong>₹${Number(item.estimated_price || 0).toFixed(2)}</strong>
+        </div>
+        <div class="item-desc">${item.description || ''}</div>
+        <div class="item-desc">Style: ${item.style || ''}</div>
+        <div class="chip-links" style="margin-top:6px;">${renderLinks(item.shopping_links)}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (data.styling_tips && data.styling_tips.length) {
+    html += `<div class="result-card"><div class="rc-header">💡 Styling Tips</div><div class="rc-body">
+      <ul class="suggestion-list">`;
+    data.styling_tips.forEach(t => { html += `<li>✅ ${t}</li>`; });
+    html += `</ul></div></div>`;
+  }
+
+  resultArea.innerHTML = html;
+  resultArea.scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderLinks(links) {
+  if (!links) return '';
+  return Object.entries(links).map(([name, url]) =>
+    `<a href="${url}" target="_blank" rel="noopener">${name}</a>`).join('');
+}
+</script>
+{% endblock %}

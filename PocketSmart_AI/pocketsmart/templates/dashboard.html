@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - PocketSmart AI{% endblock %}
+{% block content %}
+
+<div class="dashboard-hero">
+  <h1>Welcome, {{ user.username }}!</h1>
+  <p>Choose a budget planner to get started with your personalized financial planning experience</p>
+</div>
+
+<div class="dashboard-wrap">
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-icon">🏠</div>
+      <div class="card-body">
+        <h3>Home Budget Planner</h3>
+        <p>Plan your interior design budget efficiently with AI-powered recommendations for furniture,
+           lighting, and more.</p>
+        <a href="/home-planner" class="btn btn-primary btn-block">Get Started</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🎉</div>
+      <div class="card-body">
+        <h3>Party Budget Planner</h3>
+        <p>Plan your perfect event with budget allocations for venue, catering, decorations, and
+           entertainment.</p>
+        <a href="/party-planner" class="btn btn-primary btn-block">Get Started</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">💎</div>
+      <div class="card-body">
+        <h3>Jewelry Budget Planner</h3>
+        <p>Find the ideal jewelry pieces for any occasion that match your outfit and stay within your
+           budget.</p>
+        <a href="/jewelry-planner" class="btn btn-primary btn-block">Get Started</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="recent-activity">
+    <div class="ra-header">Recent Activity</div>
+    {% if recent_history %}
+      {% for item in recent_history %}
+      <div class="activity-item">
+        <div>
+          <strong>{{ item.recommendation_type|capitalize }} Budget Plan</strong><br>
+          <span class="meta">
+            Budget ₹{{ "%.0f"|format(item.input_summary.budget or 0) }}
+            &middot; Created {{ item.timestamp[:10] }}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="activity-item"><span class="meta">No recommendations yet — try one of the planners above!</span></div>
+    {% endif %}
+  </div>
+  <div style="text-align:center;margin-top:18px;">
+    <a href="/history" class="btn btn-secondary">View All Recommendation History</a>
+  </div>
+</div>
+
+{% endblock %}

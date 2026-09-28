@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Home Budget Planner - PocketSmart AI{% endblock %}
+{% block content %}
+
+<div class="planner-header">
+  <h1>Home Interior Budget Planner</h1>
+  <p>Create a customized budget plan for your dream home interior</p>
+</div>
+
+<div class="planner-wrap">
+  <div class="planner-form">
+    <div id="errorArea"></div>
+    <form id="homeForm">
+      <div class="fieldset-title">💰 Budget Details</div>
+      <div class="form-group">
+        <label>Total Budget (₹)</label>
+        <input type="number" id="total_budget" min="1" value="50000" required>
+      </div>
+
+      <div class="fieldset-title">💡 Fixtures &amp; Furniture</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Number of Lights/Fixtures</label>
+          <input type="number" id="num_lights" min="0" value="5">
+        </div>
+        <div class="form-group">
+          <label>Number of Ceiling Fans</label>
+          <input type="number" id="num_fans" min="0" value="4">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Number of Furniture Pieces</label>
+          <input type="number" id="num_furniture" min="0" value="2">
+        </div>
+        <div class="form-group">
+          <label>Number of Dining Tables</label>
+          <input type="number" id="num_dining_tables" min="0" value="1">
+        </div>
+      </div>
+
+      <div class="fieldset-title">🛋️ Rooms to Include</div>
+      <div class="checkbox-row">
+        <label><input type="checkbox" id="has_living_room" checked> Living Room</label>
+        <label><input type="checkbox" id="has_kitchen" checked> Kitchen</label>
+        <label><input type="checkbox" id="has_bedroom"> Bedroom</label>
+      </div>
+
+      <div class="fieldset-title">📝 Additional Information</div>
+      <div class="form-group">
+        <label>Special Requirements or Preferences</label>
+        <textarea id="additional_requirements" placeholder="Any specific requirements or preferences..."></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">📋 Generate Recommendations</button>
+    </form>
+  </div>
+
+  <div id="resultArea"></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('homeForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorArea = document.getElementById('errorArea');
+  const resultArea = document.getElementById('resultArea');
+  errorArea.innerHTML = '';
+  resultArea.innerHTML = '<div class="loading-spinner">Generating your personalized recommendations…</div>';
+
+  const payload = {
+    total_budget: parseFloat(document.getElementById('total_budget').value),
+    num_lights: parseInt(document.getElementById('num_lights').value || 0),
+    num_fans: parseInt(document.getElementById('num_fans').value || 0),
+    num_furniture: parseInt(document.getElementById('num_furniture').value || 0),
+    num_dining_tables: parseInt(document.getElementById('num_dining_tables').value || 0),
+    has_living_room: document.getElementById('has_living_room').checked,
+    has_kitchen: document.getElementById('has_kitchen').checked,
+    has_bedroom: document.getElementById('has_bedroom').checked,
+    additional_requirements: document.getElementById('additional_requirements').value || null,
+  };
+
+  try {
+    const res = await pocketSmartAuthFetch('/home-budget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to generate recommendations');
+    }
+    const data = await res.json();
+    renderResult(data, payload.total_budget);
+  } catch (err) {
+    resultArea.innerHTML = '';
+    errorArea.innerHTML = `<div class="alert-error">${err.message}</div>`;
+  }
+});
+
+function renderResult(data, totalBudget) {
+  const resultArea = document.getElementById('resultArea');
+  let html = `
+    <div class="result-card">
+      <div class="rc-header">Your Personalized Budget Plan</div>
+      <div class="rc-body">
+        <div class="budget-summary">
+          <div>Total Budget: <span class="amount">₹${Number(totalBudget).toFixed(2)}</span></div>
+          <div>Remaining Budget: <span class="amount remaining">₹${Number(data.remaining_budget || 0).toFixed(2)}</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  (data.budget_breakdown || []).forEach(cat => {
+    html += `<div class="result-card"><div class="rc-body category-block">
+      <div class="cat-title">${cat.category}</div>
+      <div class="cat-allocation">Allocation: ₹${Number(cat.allocation || 0).toFixed(2)}</div>
+      <table class="item-table">
+        <tr><th>Item</th><th>Price</th><th>Qty</th><th>Shopping Links</th></tr>`;
+    (cat.items || []).forEach(item => {
+      html += `<tr>
+        <td><strong>${item.name || ''}</strong><div class="item-desc">${item.description || ''}</div></td>
+        <td>₹${Number(item.estimated_price || 0).toFixed(2)}</td>
+        <td>${item.quantity ?? ''}</td>
+        <td><div class="chip-links">${renderLinks(item.shopping_links)}</div></td>
+      </tr>`;
+    });
+    html += `</table></div></div>`;
+  });
+
+  if (data.additional_suggestions && data.additional_suggestions.length) {
+    html += `<div class="result-card"><div class="rc-header">💡 Additional Suggestions</div><div class="rc-body">
+      <ul class="suggestion-list">`;
+    data.additional_suggestions.forEach(s => { html += `<li>✅ ${s}</li>`; });
+    html += `</ul></div></div>`;
+  }
+
+  resultArea.innerHTML = html;
+  resultArea.scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderLinks(links) {
+  if (!links) return '';
+  return Object.entries(links).map(([name, url]) =>
+    `<a href="${url}" target="_blank" rel="noopener">${name}</a>`).join('');
+}
+</script>
+{% endblock %}

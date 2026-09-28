@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Party Budget Planner - PocketSmart AI{% endblock %}
+{% block content %}
+
+<div class="planner-header">
+  <h1>Party Budget Planner</h1>
+  <p>Plan your perfect event with AI-powered budget recommendations</p>
+</div>
+
+<div class="planner-wrap">
+  <div class="planner-form">
+    <div id="errorArea"></div>
+    <form id="partyForm">
+      <div class="fieldset-title">💰 Basic Information</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Total Budget (₹)</label>
+          <input type="number" id="total_budget" min="1" value="20000" required>
+        </div>
+        <div class="form-group">
+          <label>Number of Guests</label>
+          <input type="number" id="num_guests" min="1" value="15" required>
+        </div>
+      </div>
+
+      <div class="fieldset-title">🎈 Event Details</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Party Type</label>
+          <select id="party_type">
+            <option>Birthday</option>
+            <option>Wedding</option>
+            <option>Corporate</option>
+            <option>Anniversary</option>
+            <option>Baby Shower</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Venue Type</label>
+          <input type="text" id="venue_type" placeholder="e.g. Home, Banquet Hall, Outdoor">
+        </div>
+      </div>
+
+      <div class="fieldset-title">📋 Party Needs</div>
+      <div class="checkbox-row">
+        <label><input type="checkbox" id="needs_catering" checked> Catering</label>
+        <label><input type="checkbox" id="needs_decoration" checked> Decoration</label>
+        <label><input type="checkbox" id="needs_entertainment"> Entertainment</label>
+      </div>
+
+      <div class="fieldset-title">💬 Additional Requirements</div>
+      <div class="form-group">
+        <label>Special requests, themes, dietary restrictions, etc.</label>
+        <textarea id="additional_requirements"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">📋 Generate Budget Plan</button>
+    </form>
+  </div>
+
+  <div id="resultArea"></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('partyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorArea = document.getElementById('errorArea');
+  const resultArea = document.getElementById('resultArea');
+  errorArea.innerHTML = '';
+  resultArea.innerHTML = '<div class="loading-spinner">Generating your personalized party plan…</div>';
+
+  const payload = {
+    total_budget: parseFloat(document.getElementById('total_budget').value),
+    num_guests: parseInt(document.getElementById('num_guests').value),
+    party_type: document.getElementById('party_type').value,
+    venue_type: document.getElementById('venue_type').value || null,
+    needs_catering: document.getElementById('needs_catering').checked,
+    needs_decoration: document.getElementById('needs_decoration').checked,
+    needs_entertainment: document.getElementById('needs_entertainment').checked,
+    additional_requirements: document.getElementById('additional_requirements').value || null,
+  };
+
+  try {
+    const res = await pocketSmartAuthFetch('/party-budget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to generate recommendations');
+    }
+    const data = await res.json();
+    renderResult(data, payload.total_budget);
+  } catch (err) {
+    resultArea.innerHTML = '';
+    errorArea.innerHTML = `<div class="alert-error">${err.message}</div>`;
+  }
+});
+
+function renderResult(data, totalBudget) {
+  const resultArea = document.getElementById('resultArea');
+  let html = `
+    <div class="result-card">
+      <div class="rc-header">Your Party Budget Plan</div>
+      <div class="rc-body">
+        <div class="budget-summary">
+          <div>Total Budget: <span class="amount">₹${Number(totalBudget).toFixed(2)}</span></div>
+          <div>Remaining Budget: <span class="amount remaining">₹${Number(data.remaining_budget || 0).toFixed(2)}</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  (data.budget_breakdown || []).forEach(cat => {
+    html += `<div class="result-card"><div class="rc-body category-block">
+      <div class="cat-title">${cat.category}</div>
+      <div class="cat-allocation">Allocation: ₹${Number(cat.allocation || 0).toFixed(2)}</div>
+      <table class="item-table">
+        <tr><th>Item</th><th>Price</th><th>Qty</th><th>Shopping Links</th></tr>`;
+    (cat.items || []).forEach(item => {
+      html += `<tr>
+        <td><strong>${item.name || ''}</strong><div class="item-desc">${item.description || ''}</div></td>
+        <td>₹${Number(item.estimated_price || 0).toFixed(2)}</td>
+        <td>${item.quantity ?? ''}</td>
+        <td><div class="chip-links">${renderLinks(item.shopping_links)}</div></td>
+      </tr>`;
+    });
+    html += `</table></div></div>`;
+  });
+
+  if (data.venue_suggestions && data.venue_suggestions.length) {
+    html += `<div class="result-card"><div class="rc-header">📍 Venue Suggestions</div><div class="rc-body">`;
+    data.venue_suggestions.forEach(v => {
+      html += `<div style="margin-bottom:12px;">
+        <strong>${v.name || ''}</strong> — ₹${Number(v.estimated_cost || 0).toFixed(2)}<br>
+        <span class="item-desc">Type: ${v.type || ''} &middot; Capacity: ${v.capacity ?? ''}</span><br>
+        <div class="chip-links">${renderLinks(v.search_links)}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (data.additional_suggestions && data.additional_suggestions.length) {
+    html += `<div class="result-card"><div class="rc-header">💡 Additional Suggestions</div><div class="rc-body">
+      <ul class="suggestion-list">`;
+    data.additional_suggestions.forEach(s => { html += `<li>✅ ${s}</li>`; });
+    html += `</ul></div></div>`;
+  }
+
+  resultArea.innerHTML = html;
+  resultArea.scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderLinks(links) {
+  if (!links) return '';
+  return Object.entries(links).map(([name, url]) =>
+    `<a href="${url}" target="_blank" rel="noopener">${name}</a>`).join('');
+}
+</script>
+{% endblock %}
